@@ -1,0 +1,10 @@
+1. Python version 3.7.3 is used
+
+2. For lexical analysis python lex implementation PLY is used that is lex.py
+
+3. workdir contains both build.sh and exec.sh
+
+4. For executing the compiler, have to use the follwing command from inside of the workdir
+./exec.sh <filepath>
+
+5. For <filepath> have to use absolute file path 
