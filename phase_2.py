@@ -602,8 +602,13 @@ def expr():
             assignTreeRoot = prevPar
 
         if t.value == tokens.T_LP:
-            astree.create_node("  " + str(t.lineno) + "$" + prefix + "Call:", find_node_id(t, "Call"), parent= prevPar)
-            astree.create_node("  " + str(t.lineno) + "$" + "Identifier" + ": " + ident, find_node_id(t, "Identifier"), parent=find_node_id(t, "Call"))
+            if assignTreeRoot == "":
+                astree.create_node("  " + str(t.lineno) + "$" + prefix + "Call:", find_node_id(t, "Call"), parent= prevPar)
+                astree.create_node("  " + str(t.lineno) + "$" + "Identifier" + ": " + ident, find_node_id(t, "Identifier"), parent=find_node_id(t, "Call"))
+            else:
+                astree.create_node("  " + str(t.lineno) + "$" + prefix + "Call:", find_node_id(t, "Call"), parent= assignTreeRoot)
+                astree.create_node("  " + str(t.lineno) + "$" + "Identifier" + ": " + ident, find_node_id(t, "Identifier"), parent=find_node_id(t, "Call"))
+           
             update_parent(find_node_id(t, "Call"))
             next_token()
             return actuals() and update_parent(prevPar)
@@ -807,6 +812,9 @@ def actuals():
             return False
 
 
+def getAstree():
+    if program_start():
+        return astree
 
 #start program
 def main():

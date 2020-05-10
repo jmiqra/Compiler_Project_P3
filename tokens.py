@@ -54,3 +54,5 @@ relational_op = [T_Less, T_LessEqual, T_Greater, T_GreaterEqual]
 equality_op = [T_EqualEqual, T_NotEqual]
 logical_op = [T_Not, T_And, T_Or]
 arithmatic_op = [T_Multiply, T_Divide, T_Modulus, T_Plus, T_Minus]
+
+boolOP = relational_op + equality_op
