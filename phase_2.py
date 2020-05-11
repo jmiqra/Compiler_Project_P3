@@ -259,7 +259,7 @@ def variableDecl_2():
                 if t.value == tokens.T_RC:
                     printDebug("true from varDecl_2")
                     return True
-                if(t.value == tokens.T_Else):
+                if(t.value == tokens.T_Else) or t.value == tokens.T_If:
                     printDebug("else found")
                     return True
                 next_token()
@@ -332,10 +332,11 @@ def stmt():
         handleError(t)
         return False
 
-def ifStmt():
-    printDebug("-----ifStmt")
+parList = []
 
+def ifStmt():
     prevPar = parent
+    printDebug("-----ifStmt"+ prevPar)
     node_id = find_node_id(t, "IfStmt")
     astree.create_node( "   " + "$" + "IfStmt:", node_id, parent= prevPar)
     update_parent(node_id)
@@ -363,17 +364,17 @@ def ifStmt():
         
         if t != None and t.value == tokens.T_Else:
             set_prefix("(else) ")
-            printDebug("else found")
+            printDebug("else found" + prevPar)
             next_token()
             if not stmt():
                 printDebug("False from if.. else..")
                 handleError(t)
                 return False
             else:
-                printDebug("true for if with else..")
+                printDebug("true for if with else.." + prevPar)
                 return True and clear_prefix() and update_parent(prevPar)
         else:
-            printDebug("true for if----------------------")
+            printDebug("true for if----------------------"+ prevPar)
             return True and clear_prefix() and update_parent(prevPar)
     else:
         handleError(t)
@@ -406,9 +407,8 @@ def whileStmt():
         return False 
 
 def forStmt():
-    printDebug("------forStmt")
-
     prevPar = parent
+    printDebug("------forStmt"+ prevPar)
     node_id = find_node_id(t, "ForStmt")
     astree.create_node( "   " + "$" + "ForStmt:", node_id, parent= prevPar)
     update_parent(node_id)
@@ -602,13 +602,15 @@ def expr():
             assignTreeRoot = prevPar
 
         if t.value == tokens.T_LP:
+            astree.paste(prevPar, exprTree)
+            #print(lastTreeRoot, "  =   ", exprTreeRoot, "  = ", assignTreeRoot)
             if assignTreeRoot == "":
-                astree.create_node("  " + str(t.lineno) + "$" + prefix + "Call:", find_node_id(t, "Call"), parent= prevPar)
+                astree.create_node("  " + str(t.lineno) + "$" + prefix + "Call:", find_node_id(t, "Call"), parent= exprTreeRoot)
                 astree.create_node("  " + str(t.lineno) + "$" + "Identifier" + ": " + ident, find_node_id(t, "Identifier"), parent=find_node_id(t, "Call"))
             else:
                 astree.create_node("  " + str(t.lineno) + "$" + prefix + "Call:", find_node_id(t, "Call"), parent= assignTreeRoot)
                 astree.create_node("  " + str(t.lineno) + "$" + "Identifier" + ": " + ident, find_node_id(t, "Identifier"), parent=find_node_id(t, "Call"))
-           
+            initExprTree()
             update_parent(find_node_id(t, "Call"))
             next_token()
             return actuals() and update_parent(prevPar)

@@ -132,7 +132,6 @@ def dfsTreeTraverse(v, dfsVisit):
             elif "(body)" in c.tag:
                 dfsTreeTraverse(c.identifier, dfsVisit)
                 functionSymbolTable.append(tempFuncInfo)
-                #find returnStmt
                 returnNode = None
                 childList = astree.children(c.identifier)
                 printDebug("<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>")
@@ -268,6 +267,27 @@ def dfsTreeTraverse(v, dfsVisit):
             elif "BreakStmt" in i.tag and breakFound != True:
                 handleError("*** break is only allowed inside a loop", i)
             
+            elif "PrintStmt" in i.tag:
+                childList = astree.children(i.identifier)
+                chidCount = 1
+                for c in childList:
+                    
+                    if "DoubleConstant" in c.tag:
+                        handleError("*** Incompatible argument " + str(chidCount) + ": double given, int/bool/string expected", c)
+                    elif "Constant" in c.tag or "FieldAccess" in c.tag:
+                        type = findSymbolType(c)
+                    elif "Call" in c.tag:
+                        callChild = astree.children(c.identifier)
+                        id = callChild[0].tag.split(":")[1].strip()
+                        func = findFuncById(id)
+                        type = func["returnType"]
+                    else:
+                        type = dfsTreeTraverse(c.identifier, dfsVisit)
+                    if type == "double":
+                        handleError("*** Incompatible argument " + str(chidCount) + ": double given, int/bool/string expected", c)
+                    chidCount += 1
+
+
             elif "Call" in i.tag:
                 printDebug("function Call found")
                 childList = astree.children(i.identifier)
