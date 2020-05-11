@@ -23,14 +23,32 @@ def handleError(err, astreeNode):
     astreeNodeInfo = astreeNode.identifier.split("_")
     lineNo = astreeNodeInfo[1]
     colNo = astreeNodeInfo[2]
+    codeLine = phase_2.phase_1.lines[int(lineNo)-1]
 
     printFunction("\n*** Error line " + str(lineNo) + ".")
-    printFunction(phase_2.phase_1.lines[int(lineNo)-1])
+    printFunction(codeLine)
+    
     errStr = ""
-    for i in range(int(colNo) - len(astreeNode.tag.split(":")[1].strip())):
+    #operator pointer spacing
+    spaceCount = int(colNo) - len(astreeNode.tag.split(":")[1].strip())
+    pointerCount = len(astreeNode.tag.split(":")[1].strip())
+    if( "Break" in astreeNode.tag):
+        spaceCount = int(colNo) + 1 - 6
+        pointerCount = 5
+
+    if(astreeNodeInfo[0] == "Operator"):
+        spaceCount += len(astreeNode.tag.split(":")[1].strip())
+
+    if "(test)" in astreeNode.tag:
+        temp = codeLine.split(";")
+        spaceCount = len(temp[0]) + 1 + len(temp[1]) - len(temp[1].strip())
+        pointerCount = len(temp[1].strip())
+
+    for i in range(spaceCount):
         errStr += " "
-    for j in range(len(astreeNode.tag.split(":")[1].strip())):
+    for j in range(pointerCount):
         errStr += "^"
+    
     printFunction(errStr)
     printFunction(err)
     print()
@@ -44,6 +62,7 @@ def dfsStart(root):
 
 def dfsTreeTraverse(v, dfsVisit): 
     global localSymbolTable
+    global breakFound
     dfsVisit[str(v)] = True
     astreeNode = astree.get_node(v)
     printDebug("inside dfstraverse astreeNode is" +  str(astreeNode))
@@ -51,39 +70,42 @@ def dfsTreeTraverse(v, dfsVisit):
 
         printDebug("Type of Expr" +  astreeNode.tag)
         childList = astree.children(astreeNode.identifier)
-        leftOperand = childList[0]
-        operator = childList[1]
-        rightOperand = childList[2]
+        if len(childList) == 2:
+            type = findSymbolType(childList[1])
+            return type 
+        else:
+            leftOperand = childList[0]
+            operator = childList[1]
+            rightOperand = childList[2]
+            if "Expr" in leftOperand.tag:
+                printDebug("leftOperandType is Expr")
+                leftOperandType = dfsTreeTraverse(leftOperand.identifier, dfsVisit)
+                if leftOperandType == "False":
+                    return 
+            else:
+                printDebug("leftOperandType found")
+                leftOperandType = findSymbolType(leftOperand)
+            
+            if "Expr" in rightOperand.tag:
+                printDebug("rightOperandType is Expr")
+                rightOperandType = dfsTreeTraverse(rightOperand.identifier, dfsVisit)
+                if rightOperandType == "False":
+                    return
+            else:
+                printDebug("rightOperandType found")
+                rightOperandType = findSymbolType(rightOperand)
 
-        if "Expr" in leftOperand.tag:
-            printDebug("leftOperandType is Expr")
-            leftOperandType = dfsTreeTraverse(leftOperand.identifier, dfsVisit)
-            if leftOperandType == "False":
-                return 
-        else:
-            printDebug("leftOperandType found")
-            leftOperandType = findSymbolType(leftOperand)
-        
-        if "Expr" in rightOperand.tag:
-            printDebug("rightOperandType is Expr")
-            rightOperandType = dfsTreeTraverse(rightOperand.identifier, dfsVisit)
-            if rightOperandType == "False":
-                return
-        else:
-            printDebug("rightOperandType found")
-            rightOperandType = findSymbolType(rightOperand)
-
-        if leftOperandType == rightOperandType:
-            printDebug("left right type matched" + leftOperandType)
-            printDebug("operator " + operator.tag)
-            if operator.tag.split(":")[1].strip() in tokens.boolOP:
-                return "bool"            
-            return leftOperandType
-        elif leftOperandType == None or rightOperandType == None:
-            return None
-        else:
-            handleError("*** Incompatible operands: " + leftOperandType + " " + operator.tag.split(":")[1].strip() + " " + rightOperandType, operator)
-            return None
+            if leftOperandType == rightOperandType:
+                printDebug("left right type matched" + leftOperandType)
+                printDebug("operator " + operator.tag)
+                if operator.tag.split(":")[1].strip() in tokens.boolOP:
+                    return "bool"            
+                return leftOperandType
+            elif leftOperandType == None or rightOperandType == None:
+                return None
+            else:
+                handleError("*** Incompatible operands: " + leftOperandType + " " + operator.tag.split(":")[1].strip() + " " + rightOperandType, operator)
+                return None
 
     elif "FnDecl" in astreeNode.tag:
         printDebug("inside fundecl handler...............")
@@ -129,7 +151,7 @@ def dfsTreeTraverse(v, dfsVisit):
                     else:
                         type = dfsTreeTraverse(astree.siblings(returnNode.identifier)[-1].identifier, dfsVisit)
                     if type != tempFuncInfo["returnType"]:
-                        print("*** Incompatible return: ",type, "given, ", tempFuncInfo["returnType"], " expected")
+                        handleError("*** Incompatible return: " + str(type) + " given, " + tempFuncInfo["returnType"] + " expected", returnExpr)
                 else:
                     printDebug("... not sure")
                 printDebug("function SymbolTable ..." + str(functionSymbolTable))
@@ -218,15 +240,33 @@ def dfsTreeTraverse(v, dfsVisit):
                 else:
                     printDebug("inside else field or const")
                     type = dfsTreeTraverse(i.identifier, dfsVisit)
-                printDebug("type =" +  type)
+                if type != "bool" and type != None:
+                    handleError("*** Incompatible operand: " + sthExpr[0].tag.split(":")[1].strip() + " " + str(type), sthExpr[0])
+                printDebug("type =" +  str(type))
                 continue
-            elif "ForStmt" in i.tag or "WhileStmt" in i.tag:
-                printDebug("for found")
+            
+            elif "WhileStmt" in i.tag:
                 breakFound = True
-                dfsTreeTraverse(i.identifier, dfsVisit)
+                childList = astree.children(i.identifier)
+                type = dfsTreeTraverse(childList[0].identifier, dfsVisit)
+                if type != "bool":
+                    handleError("*** Test expression must have boolean type", childList[0])
                 breakFound = False
+
+            elif "IfStmt" in i.tag:
+                dfsTreeTraverse(i.identifier, dfsVisit)
+
+            elif "ForStmt" in i.tag:
+                breakFound = True
+                childList = astree.children(i.identifier)
+                type = dfsTreeTraverse(childList[1].identifier, dfsVisit)
+                if type != "bool":
+                    print("not bool ", type, "-------> ", childList[1])
+                    handleError("*** Test expression must have boolean type", childList[1])
+                breakFound = False
+
             elif "BreakStmt" in i.tag and breakFound != True:
-                print("*** break is only allowed inside a loop")
+                handleError("*** break is only allowed inside a loop", i)
             
             elif "Call" in i.tag:
                 printDebug("function Call found")
@@ -298,7 +338,7 @@ def findFuncById(ident):
 
 
 def main():
-    #astree.show(key = False, line_type = 'ascii-sp')
+    astree.show(key = False, line_type = 'ascii-sp')
     #printDebug(astree.size())
     root = astree.root
     #printDebug(root)

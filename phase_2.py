@@ -551,7 +551,7 @@ def expr():
     global unary
 
     if t.value == tokens.T_Minus:
-        astree.create_node("  " + str(t.lineno) + "$" + prefix + "ArithmeticExpr:", find_node_id(t, "ArithmeticExpr"), parent=prevPar)
+        astree.create_node("  " + str(t.lineno) + "$" + prefix + "ArithmeticExpr:", find_node_id(t, "ArithmeticExpr"), parent=assignTreeRoot)
         astree.create_node("  " + str(t.lineno) + "$Operator: " + str(t.value), find_node_id(t, "Operator"), parent=find_node_id(t, "ArithmeticExpr"))
         update_parent(prevPar)
         unary = True
