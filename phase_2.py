@@ -214,6 +214,7 @@ def stmtBlock():
     if t.value == tokens.T_LC:
         next_token()
         if t.value == tokens.T_RC:
+            next_token()
             return True and update_parent(prevPar)
         else:
             stmtBlockParam = variableDecl_2() and t.value == tokens.T_RC

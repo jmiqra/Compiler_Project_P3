@@ -19,7 +19,7 @@ def printFunction(errStr):
     print(errStr)
     return True
 
-def handleError(err, astreeNode):
+def handleError(err, astreeNode, errType = None):
     astreeNodeInfo = astreeNode.identifier.split("_")
     lineNo = astreeNodeInfo[1]
     colNo = astreeNodeInfo[2]
@@ -49,10 +49,43 @@ def handleError(err, astreeNode):
     for j in range(pointerCount):
         errStr += "^"
     
+    if errType != None:
+        errStr = errType
+
     printFunction(errStr)
     printFunction(err)
     print()
     return True
+
+def specialErrorLine(c):
+    errType = ""    
+    if "(actuals)" in c.tag or "(test)" in c.tag:
+        lineNo = c.tag.split("$")[0].strip()
+        line = phase_2.phase_1.lines[int(lineNo) - 1]
+        if "," not in line:
+            pointerCount = len(line.split(")")[0].split("(")[1])
+            spaceCount = len(line.split(")")[0]) - pointerCount
+        
+    elif "ReadInteger" in c.tag or "ReadLine" in c.tag:
+        lineNo = c.tag.split("$")[0].strip()
+        line = phase_2.phase_1.lines[int(lineNo) - 1]
+        spaceCount = len(line.split("(")[0]) + 1
+        #print("------",c.identifier)
+        pointerCount = len(c.identifier.split("_")[0]) - 2
+
+    elif "Call" in c.tag:
+        grandChild = astree.children(c.identifier)
+        start = grandChild[0].identifier.split("_")[2]
+        end = grandChild[-1].identifier.split("_")[2]
+        pointerCount = int(end) - int(start) + 1 + 2
+        spaceCount = int(end)  - pointerCount + 1
+
+    for i in range(spaceCount):
+        errType += " "
+    for i in range(pointerCount):
+        errType += "^"  
+
+    return errType
 
 
 def dfsStart(root): 
@@ -65,11 +98,17 @@ def dfsTreeTraverse(v, dfsVisit):
     global breakFound
     dfsVisit[str(v)] = True
     astreeNode = astree.get_node(v)
-    printDebug("inside dfstraverse astreeNode is" +  str(astreeNode))
-    if "Expr" in astreeNode.identifier:
-
+    #printDebug("astree node " + astreeNode)
+    if "ReadIntegerExpr" in astreeNode.tag:
+        return "int"
+    
+    elif "ReadLineExpr" in astreeNode.tag:
+        return "string"
+    
+    elif "Expr" in astreeNode.identifier:
         printDebug("Type of Expr" +  astreeNode.tag)
         childList = astree.children(astreeNode.identifier)
+        #print("----> ",len(childList), "=====" , astreeNode)
         if len(childList) == 2:
             type = findSymbolType(childList[1])
             return type 
@@ -108,7 +147,6 @@ def dfsTreeTraverse(v, dfsVisit):
                 return None
 
     elif "FnDecl" in astreeNode.tag:
-        printDebug("inside fundecl handler...............")
         tempFuncInfo = {}
         paramCount = 1
         childList = astree.children(astreeNode.identifier)
@@ -125,7 +163,6 @@ def dfsTreeTraverse(v, dfsVisit):
                 type = grandChildList[0].tag.split(":")[1].strip()
                 tempFuncInfo["param_" + str(paramCount)] = type
                 paramCount += 1
-                #putting vardecl in table
                 identifier = grandChildList[1].tag.split(":")[1].strip()
                 localSymbolTable[identifier] = type
 
@@ -134,14 +171,13 @@ def dfsTreeTraverse(v, dfsVisit):
                 functionSymbolTable.append(tempFuncInfo)
                 returnNode = None
                 childList = astree.children(c.identifier)
-                printDebug("<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>")
                 for c in childList:
                     printDebug(c)
                     if "ReturnStmt" in c.tag:
                         printDebug("return found")
                         returnNode = c
 
-                printDebug("RETURN CHILD..." +  str(returnNode))
+                printDebug("RETURN c..." +  str(returnNode))
                 if returnNode != None:
                     printDebug("return found")
                     returnExpr = astree.siblings(returnNode.identifier)[-1]
@@ -159,8 +195,11 @@ def dfsTreeTraverse(v, dfsVisit):
                 #todo return type match handle
         return
 
+    elif "FieldAccess" in astreeNode.tag or "Constant" in astreeNode.tag:        
+        type = findSymbolType(astreeNode)
+        return type
+
     elif "Call" in astreeNode.tag:
-        printDebug("function Call found")
         childList = astree.children(astreeNode.identifier)
         numOfParam = len(childList) - 1
         funcId = childList[0].tag.split(":")[1].strip()
@@ -176,37 +215,26 @@ def dfsTreeTraverse(v, dfsVisit):
                     if "FieldAccess" in childList[i].tag or "Constant" in childList[i].tag:
                         printDebug("constant found")
                         type = findSymbolType(childList[i])
-                        printDebug("type " + type)
                     else:
                         printDebug("constant not found")
                         type = dfsTreeTraverse(childList[i].identifier, dfsVisit)
                     if type != func["param_" + str(i)]:
                         handleError("*** Incompatible argument " + str(i) + ": " + type + " given, " + func["param_" + str(i)] +  " expected", childList[i])
-                        break
                     else:
-                        printDebug("good to go...")
+                        pass
 
         return func["returnType"]
      
 # for scope search   
     for i in astree.children(v): 
-        #printDebug(i)
         if dfsVisit.get(str(i.identifier)) == None:
-            #printDebug(i.identifier, " ",i.tag ) 
-            #printDebug("not found")
             if "AssignExpr" in i.tag:
-                printDebug("assignment expr found.....")
                 fieldAccess = astree.children(i.identifier)
                 grandChildList = astree.children(fieldAccess[0].identifier)
                 identifier = grandChildList[0].tag.split(":")[1].strip()
                 printDebug(localSymbolTable)
-                printDebug("identifier = " + identifier)
                 leftOperandType = localSymbolTable.get(identifier)
-                printDebug("type = " + leftOperandType)
-                #do type check
-                
                 expr = astree.siblings(fieldAccess[0].identifier)
-                printDebug("expr" +  str(expr))
                 if "FieldAccess" in expr[1].tag or "Constant" in expr[1].tag:
                     rightOperandType = findSymbolType(expr[1])
                 else:
@@ -226,21 +254,19 @@ def dfsTreeTraverse(v, dfsVisit):
                     globalSymbolTable[identifier] = type
                 else:
                     localSymbolTable[identifier] = type
-                printDebug("symboltable ********************" + str(localSymbolTable))
-                printDebug("global symboltable ********************"+ str(globalSymbolTable))
-
                 continue
+
             elif "LogicalExpr" in i.tag:
                 printDebug("logical expr found")
-                sthExpr = astree.children(i.identifier)
-                if "FieldAccess" in sthExpr[1].tag or "Constant" in sthExpr[1].tag:
+                tmpExpr = astree.children(i.identifier)
+                if "FieldAccess" in tmpExpr[1].tag or "Constant" in tmpExpr[1].tag:
                     printDebug("inside if field or const")
-                    type = findSymbolType(sthExpr[1])
+                    type = findSymbolType(tmpExpr[1])
                 else:
                     printDebug("inside else field or const")
                     type = dfsTreeTraverse(i.identifier, dfsVisit)
                 if type != "bool" and type != None:
-                    handleError("*** Incompatible operand: " + sthExpr[0].tag.split(":")[1].strip() + " " + str(type), sthExpr[0])
+                    handleError("*** Incompatible operand: " + tmpExpr[0].tag.split(":")[1].strip() + " " + str(type), tmpExpr[0])
                 printDebug("type =" +  str(type))
                 continue
             
@@ -253,14 +279,18 @@ def dfsTreeTraverse(v, dfsVisit):
                 breakFound = False
 
             elif "IfStmt" in i.tag:
-                dfsTreeTraverse(i.identifier, dfsVisit)
-
+                tmpChild = astree.children(i.identifier)[0]
+                type = dfsTreeTraverse(tmpChild.identifier, dfsVisit)
+                #printDebug("inside if = " + type)
+                if type != "bool" and type != None:
+                    errType = specialErrorLine(astree.children(i.identifier)[0])
+                    handleError("*** Test expression must have boolean type", i, errType)
             elif "ForStmt" in i.tag:
                 breakFound = True
                 childList = astree.children(i.identifier)
                 type = dfsTreeTraverse(childList[1].identifier, dfsVisit)
                 if type != "bool":
-                    print("not bool ", type, "-------> ", childList[1])
+                    #print("not bool ", type, "-------> ", childList[1])
                     handleError("*** Test expression must have boolean type", childList[1])
                 breakFound = False
 
@@ -284,7 +314,8 @@ def dfsTreeTraverse(v, dfsVisit):
                     else:
                         type = dfsTreeTraverse(c.identifier, dfsVisit)
                     if type == "double":
-                        handleError("*** Incompatible argument " + str(chidCount) + ": double given, int/bool/string expected", c)
+                        errType = specialErrorLine(c)
+                        handleError("*** Incompatible argument " + str(chidCount) + ": double given, int/bool/string expected", c, errType)
                     chidCount += 1
 
 
@@ -303,17 +334,14 @@ def dfsTreeTraverse(v, dfsVisit):
                     else:
                         for j in range(1, len(childList)):
                             if "FieldAccess" in childList[j].tag or "Constant" in childList[j].tag:
-                                printDebug("constant found")
-                                
                                 type = findSymbolType(childList[j])
                             else:
-                                printDebug("constant not found")
                                 type = dfsTreeTraverse(childList[j].identifier, dfsVisit)
                             if type != func["param_" + str(j)]:
-                                handleError("*** Incompatible argument " + str(j) + ": " + type + " given, " + func["param_" + str(j)] +  " expected", childList[j])
-                                break
+                                errType = specialErrorLine(childList[j])
+                                handleError("*** Incompatible argument " + str(j) + ": " + type + " given, " + func["param_" + str(j)] +  " expected", childList[j], errType)
                             else:
-                                printDebug("good to go...")
+                                pass
             else:
                 dfsTreeTraverse(i.identifier, dfsVisit)
         else:
@@ -323,25 +351,20 @@ def dfsTreeTraverse(v, dfsVisit):
 def findSymbolType(astreeNode): 
     printDebug("inside findSymbolType() ")
     if "FieldAccess" in astreeNode.tag:
-        printDebug("fieldaccess found....")
         childList = astree.children(astreeNode.identifier)
         if "Identifier" in childList[0].tag:
             ident  = childList[0].tag.split(":")[1].strip()
             type = localSymbolTable.get(ident)
-            printDebug("ident" + ident)
-            printDebug("localSymbol" + str(localSymbolTable))
-            ############# if not found... type error
             if type == None:
-                print("********variable not found in local")
                 type = globalSymbolTable.get(ident)
                 if type == None:
-                    return "False"
+                    c = astree.children(astreeNode.identifier)[0]
+                    handleError("*** No declaration found for variable \'" + ident + "\'", c)
+                    return None
                 else:
                     return type
             return type
     else:
-        #param inside typeMap.get(param)
-        #param =   5$IntConstant: 5
         key = astreeNode.tag.split(":")[0].split("$")[1]
         if ")" in key:
             key = key.split(")")[1].strip()
@@ -358,7 +381,7 @@ def findFuncById(ident):
 
 
 def main():
-    astree.show(key = False, line_type = 'ascii-sp')
+    #astree.show(key = False, line_type = 'ascii-sp')
     #printDebug(astree.size())
     root = astree.root
     #printDebug(root)
