@@ -2,9 +2,11 @@
 
 2. For lexical analysis python lex implementation PLY is used that is lex.py
 
-3. workdir contains both build.sh and exec.sh
+3. Error handle done based on AST and sysmbolTable
 
-4. For executing the compiler, have to use the follwing command from inside of the workdir
+4. workdir contains both build.sh and exec.sh
+
+5. For executing the compiler, have to use the follwing command from inside of the workdir
 ./exec.sh <filepath>
 
-5. For <filepath> have to use absolute file path 
+6. For <filepath> have to use absolute file path 
